@@ -562,9 +562,28 @@ let S={
   screen:'home',config:null,
   questions:[],current:0,
   answers:{},revealed:{},fillInputs:{},sataSel:{},
+  shuffleOrder:{},
   wrongQ:loadWrong(),sessions:loadSessions(),
   mode:'normal'
 };
+
+// ============================================================
+// SHUFFLE HELPERS
+// ============================================================
+function getShuffleOrder(idx){
+  if(!S.shuffleOrder[idx]){
+    const q=S.questions[idx];
+    if(!q||q.type==='fill'){S.shuffleOrder[idx]=null;return null;}
+    const order=[...Array(q.opts.length).keys()].sort(()=>Math.random()-.5);
+    S.shuffleOrder[idx]=order;
+  }
+  return S.shuffleOrder[idx];
+}
+// Given a shuffled display index, return the original option index
+function origIdx(qIdx,displayIdx){
+  const order=getShuffleOrder(qIdx);
+  return order?order[displayIdx]:displayIdx;
+}
 
 // ============================================================
 // QUESTION SELECTION ENGINE
@@ -777,29 +796,35 @@ function renderQuiz(){
 
 function renderMC(q,revealed){
   const sel=S.answers[S.current];
-  return q.opts.map((o,i)=>{
+  const order=getShuffleOrder(S.current);
+  const displayOpts=order?order.map(i=>q.opts[i]):q.opts;
+  return displayOpts.map((o,di)=>{
+    const oi=order?order[di]:di;
     let cls='opt';
     if(revealed){
-      if(q.ans.includes(i))cls+=' correct';
-      else if(sel===i&&!q.ans.includes(i))cls+=' incorrect';
-    }else if(sel===i)cls+=' selected';
-    return`<div class="${cls}" onclick="${!revealed?`selectMC(${i})`:''}" style="${revealed?'cursor:default':''}">
-      <span class="letter">${String.fromCharCode(65+i)}.</span><span>${o}</span>
+      if(q.ans.includes(oi))cls+=' correct';
+      else if(sel===oi&&!q.ans.includes(oi))cls+=' incorrect';
+    }else if(sel===oi)cls+=' selected';
+    return`<div class="${cls}" onclick="${!revealed?`selectMC(${oi})`:''}" style="${revealed?'cursor:default':''}">
+      <span class="letter">${String.fromCharCode(65+di)}.</span><span>${o}</span>
     </div>`;
   }).join('');
 }
 
 function renderSATA(q,revealed){
   const sel=S.sataSel[S.current]||[];
+  const order=getShuffleOrder(S.current);
+  const displayOpts=order?order.map(i=>q.opts[i]):q.opts;
   return`<div class="info-box" style="margin-bottom:.75rem;font-size:13px">Select ALL that apply. Partial credit: +1 for each correct selection, −1 for each incorrect selection.</div>`+
-  q.opts.map((o,i)=>{
+  displayOpts.map((o,di)=>{
+    const oi=order?order[di]:di;
     let cls='opt';
     if(revealed){
-      if(q.ans.includes(i))cls+=' correct';
-      else if(sel.includes(i)&&!q.ans.includes(i))cls+=' incorrect';
-    }else if(sel.includes(i))cls+=' selected';
-    return`<div class="${cls}" onclick="${!revealed?`toggleSATA(${i})`:''}" style="${revealed?'cursor:default':''}">
-      <input type="checkbox" ${sel.includes(i)?'checked':''} ${revealed?'disabled':''} onclick="event.stopPropagation()" onchange="${!revealed?`toggleSATA(${i})`:''}"><span>${o}</span>
+      if(q.ans.includes(oi))cls+=' correct';
+      else if(sel.includes(oi)&&!q.ans.includes(oi))cls+=' incorrect';
+    }else if(sel.includes(oi))cls+=' selected';
+    return`<div class="${cls}" onclick="${!revealed?`toggleSATA(${oi})`:''}" style="${revealed?'cursor:default':''}">
+      <input type="checkbox" ${sel.includes(oi)?'checked':''} ${revealed?'disabled':''} onclick="event.stopPropagation()" onchange="${!revealed?`toggleSATA(${oi})`:''}">&nbsp;<span>${o}</span>
     </div>`;
   }).join('');
 }
@@ -975,14 +1000,14 @@ function startExam(){
   S.config={total,mods,drug};
   S.questions=pickQuestions(S.config,ALL_Q);
   if(S.questions.length===0){alert('No questions matched your configuration. Try adjusting the percentages.');return;}
-  S.current=0;S.answers={};S.revealed={};S.fillInputs={};S.sataSel={};
+  S.current=0;S.answers={};S.revealed={};S.fillInputs={};S.sataSel={};S.shuffleOrder={};
   S.mode='normal';S.screen='quiz';render();
 }
 
 function startWrongOnly(){
   const wrongIds=Object.keys(S.wrongQ).filter(id=>S.wrongQ[id]>0);
   S.questions=ALL_Q.filter(q=>wrongIds.includes(q.id)).sort(()=>Math.random()-.5);
-  S.current=0;S.answers={};S.revealed={};S.fillInputs={};S.sataSel={};
+  S.current=0;S.answers={};S.revealed={};S.fillInputs={};S.sataSel={};S.shuffleOrder={};
   S.mode='wrongonly';S.screen='wrongonly';render();
 }
 
